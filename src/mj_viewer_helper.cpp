@@ -98,6 +98,14 @@ void viewer_init(ViewerCtx& v, const mjModel* m) {
   mjv_defaultCamera(&v.cam);
   mjv_defaultPerturb(&v.pert);
 
+  v.cam.type = mjCAMERA_FREE;
+  v.cam.lookat[0] = -0.0;
+  v.cam.lookat[1] = +0.0;
+  v.cam.lookat[2] = +1.3;
+  v.cam.distance = 7.0;
+  v.cam.azimuth = 0.0;
+  v.cam.elevation = -20.0;
+
   if (!glfwInit()) mju_error("Could not initialize GLFW");
 
   glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
