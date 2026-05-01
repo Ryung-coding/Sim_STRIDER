@@ -45,8 +45,7 @@ inline constexpr double kIX = 0.3;  /**< Position integral gains */
 inline constexpr double J[9] = {0.27, 0.00, 0.00,
                                 0.00, 0.49, 0.00,
                                 0.00, 0.00, 0.76};
-inline constexpr double M  = 6.8;
-// inline constexpr double M  = 6.0 + 0.43;
+inline constexpr double M  = 6.0 + 0.43;
 inline constexpr double G  = 9.80665;
 
 inline constexpr double VIRTUAL_MARGIN    = 3.0; // thrust margin of each thruster [N]
@@ -89,13 +88,12 @@ inline const     double GOES_2_ZERO_B         = 1.0 - GOES_2_ZERO_A;            
 
 // ===== CoM estimating parameter =====
 inline constexpr double LINK_MASS[5] = {0.374106, 0.13658, 0.0415148, 0.102003, 0.3734}; // link mass [kg]
-inline constexpr double CENTER_MASS  = 2.6845345;   // center body + load mass [kg]
-// inline constexpr double CENTER_MASS  = 1.3145 + 0.575 + 0.43;  // center body + E.E. mass + load mass [kg]
+inline constexpr double CENTER_MASS  = 1.3145 + 0.575 + 0.43;  // center body + E.E. mass + load mass [kg]
 inline constexpr double TOTAL_MASS   = CENTER_MASS + 4.0*(LINK_MASS[0]+LINK_MASS[1]+LINK_MASS[2]+LINK_MASS[3]+LINK_MASS[4]); // strider mass (same as M) [kg]
 inline constexpr double LINK_COM_DIST[5] = {-0.040, -0.031, -0.055, -0.012, -0.020};     // link com distance [m]
 
 // ===== MPC parameters  =====
-inline constexpr double BUILD_TIME       = 43.0; // BUILD_TIME > 15.0
+inline constexpr double BUILD_TIME       = 43.0; // BUILD_TIME > 15.0 | my COM 43.0
 inline constexpr double ARM_DELAY_TAU    = 0.03; // MuJoCo actuator delay [sec]
 inline const     double ARM_DELAY_ALPHA  = std::exp(-CTRL_DT / ARM_DELAY_TAU); // not a tunable parameter
 inline const     double ARM_DELAY_BETA   = 1.0 - ARM_DELAY_ALPHA;              // not a tunable parameter
@@ -116,8 +114,8 @@ inline constexpr std::size_t MPC_NP      = 28; // This value must be same as >> 
 inline constexpr std::chrono::steady_clock::duration MPC_TIMEOUT_DURATUION = std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(static_cast<double>(N_STEPS_REQ-1) * MPC_STEP_DT));
 
 // ===== gradient descent parameters =====
-inline constexpr double ARM_OPT_BETA1    = 0.01;                   // η ascent rate
-inline constexpr double ARM_OPT_BETA2    = 0.001;                  // C ascent rate
+inline constexpr double ARM_OPT_BETA1    = 0.0100;                   // η ascent rate
+inline constexpr double ARM_OPT_BETA2    = 0.0025;                  // C ascent rate
 inline constexpr double ARM_OPT_EPS      = 1e-4;                   // finite difference step
 
 inline constexpr double POWER_GAMMA      = 10.000;                 // loss factor
@@ -125,10 +123,10 @@ inline constexpr double AIR_DENSITY      = 1.225;                  // kg/m³
 inline constexpr double PROP_DISK_AREA   = M_PI * 0.1524 * 0.1524; // 12-inch prop radius = 0.1524m 
 
 // ===== MuJoCo added mass parameters =====
-static constexpr mjtNum BONG_TIP_LOAD_MASS = 0.4;
-static constexpr mjtNum BONG_TIP_LOAD_INERTIA = 1.44 * 1e-4;
-// static constexpr mjtNum BONG_TIP_LOAD_MASS =0.0043;
-// static constexpr mjtNum BONG_TIP_LOAD_INERTIA = 0.215*0.215*0.0043;
+static constexpr mjtNum BONG_TIP_LOAD_MASS =0.43;
+static constexpr mjtNum BONG_TIP_LOAD_IXX = 0.0057226;
+static constexpr mjtNum BONG_TIP_LOAD_IYY = 0.0038198;
+static constexpr mjtNum BONG_TIP_LOAD_IZZ = 0.0063820;
 
 // ===== MuJoCo viewer parameters =====
 inline constexpr double PATH_SEC = 10.0;   // history length [sec]

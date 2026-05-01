@@ -285,8 +285,8 @@ int main() {
 
       // --- position control ---
       if (elapsed_double >= param::BUILD_TIME) {l_traj_pva(elapsed_double + std::fmod(12.05 - std::fmod(param::BUILD_TIME, 15.0) + 15.0, 15.0), cmd.pos, cmd.vel, cmd.acc);} // option: [fig8_point_pva/circle_pva/l_traj_pva]
-      else if (elapsed_double <= 2.0) {cmd.pos = goes_to(Eigen::Vector3d(-1.2,0.0,-1.3), elapsed_double, 2.0);}
-      else {cmd.pos = Eigen::Vector3d(-1.2,0.0,-1.3);}
+      else if (elapsed_double <= 2.0) {cmd.pos = goes_to(Eigen::Vector3d(0.0,-2.0,-1.3), elapsed_double, 2.0);}
+      else {cmd.pos = Eigen::Vector3d(0.0,-2.0,-1.3);}
       cmd.vel = Eigen::Vector3d::Zero(); // not-use velocity command
       cmd.acc = Eigen::Vector3d::Zero(); // not-use velocity command
 
@@ -459,11 +459,11 @@ int main() {
       smoothed_Tau = 0.9 * smoothed_Tau + 0.1 * Tau;
 
       // --- virtual thrust clipping (tightening starts at 10s, finishes at 15s)---
-      double thrust_sat = 1e12;
-      if (elapsed_double >= param::BUILD_TIME)      {thrust_sat = param::SATURATION_THRUST;}
-      else if (elapsed_double >= 10.0) {thrust_sat = param::SATURATION_THRUST + (1.0 - 0.2*param::CTRL_DT) * 5.0;}
-      else                             {thrust_sat = param::SATURATION_THRUST + 5.0;}
-      // double thrust_sat = param::SATURATION_THRUST;
+      // double thrust_sat = 1e12;
+      // if (elapsed_double >= param::BUILD_TIME)      {thrust_sat = param::SATURATION_THRUST;}
+      // else if (elapsed_double >= 10.0) {thrust_sat = param::SATURATION_THRUST + (1.0 - 0.2*param::CTRL_DT) * 5.0;}
+      // else                             {thrust_sat = param::SATURATION_THRUST + 5.0;}
+      double thrust_sat = param::SATURATION_THRUST;
       for (uint8_t i=0; i<4; ++i) {smoothed_F(i) = (smoothed_F(i) > thrust_sat) ? thrust_sat : smoothed_F(i);}
 
       // --- Step simulation at SIM_HZ using ZOH ---

@@ -1,8 +1,8 @@
 import numpy as np
 
 # h_expr constraint
-F_MIN   = 8.0  * np.array([1.0, 1.0, 1.0, 1.0]) # thrust bound (F1,F2,F3,F4)
-F_MAX   = 19.1 * np.array([1.0, 1.0, 1.0, 1.0]) # [N]
+F_MIN   = 2.00  * np.array([1.0, 1.0, 1.0, 1.0]) # thrust bound (F1,F2,F3,F4)
+F_MAX   = 43.0 * np.array([1.0, 1.0, 1.0, 1.0]) # [N]
 
 # input constraint
 DTHETA_MIN     = -45.0 * np.array([1.0, 1.0, 0.25]) * np.pi / 180.0

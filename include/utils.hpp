@@ -156,8 +156,8 @@ static inline void circle_pva(double t_sec, Eigen::Vector3d& p_d, Eigen::Vector3
 }
 
 static inline void l_traj_pva(double t_sec, Eigen::Vector3d& p_d, Eigen::Vector3d& v_d, Eigen::Vector3d& a_d) {
-  constexpr double lx_ = 1.2;              // width in X [m]
-  constexpr double ly_ = 0.0;              // width in Y [m]
+  constexpr double lx_ = 0.0;              // width in X [m]
+  constexpr double ly_ = 2.0;              // width in Y [m]
   constexpr double T_  = 2.5;             // base period [sec]
   constexpr double f   = 2.0 * M_PI / T_;  // [rad/s]
 
@@ -916,27 +916,26 @@ static inline int sensor_adr_check(const mjModel* m, const char* name, int expec
 }
 
 static inline void set_bong_tip_load_enabled(mjModel* m, mjData* d, int body_id, int geom_id, bool enabled) {
-  if (body_id < 0) {return;}
+  
+  if (body_id < 0) { return; }
 
-  const mjtNum mass = enabled ? param::BONG_TIP_LOAD_MASS : 1e-9;
-  const mjtNum inertia = enabled ? param::BONG_TIP_LOAD_INERTIA : 1e-12;
+  m->body_mass[body_id] = enabled ? param::BONG_TIP_LOAD_MASS : 1e-9;
 
-  m->body_mass[body_id] = mass;
-  m->body_inertia[3 * body_id + 0] = inertia;
-  m->body_inertia[3 * body_id + 1] = inertia;
-  m->body_inertia[3 * body_id + 2] = inertia;
+  m->body_inertia[3 * body_id + 0] = enabled ? param::BONG_TIP_LOAD_IXX : 1e-12;
+  m->body_inertia[3 * body_id + 1] = enabled ? param::BONG_TIP_LOAD_IYY : 1e-12;
+  m->body_inertia[3 * body_id + 2] = enabled ? param::BONG_TIP_LOAD_IZZ : 1e-12;
 
-  if (geom_id >= 0) {m->geom_rgba[4 * geom_id + 3] = enabled ? 1.0 : 0.0;}
+  if (geom_id >= 0) {
+    m->geom_rgba[4 * geom_id + 3] = enabled ? 1.0 : 0.0;
+  }
 
-  // Recompute mjModel derived constants using scratch mjData.
-  // Do not pass live mjData here: mj_setConst works around qpos0 and may disturb d->qpos.
   mjData* d_scratch = mj_makeData(m);
   if (d_scratch != nullptr) {
     mj_setConst(m, d_scratch);
     mj_deleteData(d_scratch);
   }
 
-  mj_forward(m, d); // Refresh live mjData using the current qpos/qvel.
+  mj_forward(m, d);
 }
 
 inline std::filesystem::path get_executable_path() {

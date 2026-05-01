@@ -22,8 +22,7 @@ ZETA = 10.0
 
 # IK & CoM estimate
 M_LINK   = np.array([0.374106, 0.13658, 0.0415148, 0.102003, 0.3734]) # each link mass [kg]
-M_CENTER = 2.6845345                                                  # center body + load mass [kg]
-# M_CENTER = 1.3145 + 0.575 + 0.43                                      # center body + E.E. mass + load mass [kg]
+M_CENTER = 1.3145 + 0.575 + 0.43                                      # center body + E.E. mass + load mass [kg]
 
 # ---------- use_arm & use_full parameters ----------
 # CoT actuator time constant
