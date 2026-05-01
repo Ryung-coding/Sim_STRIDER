@@ -285,8 +285,8 @@ int main() {
 
       // --- position control ---
       if (elapsed_double >= param::BUILD_TIME) {l_traj_pva(elapsed_double + std::fmod(12.05 - std::fmod(param::BUILD_TIME, 15.0) + 15.0, 15.0), cmd.pos, cmd.vel, cmd.acc);} // option: [fig8_point_pva/circle_pva/l_traj_pva]
-      else if (elapsed_double <= 2.0) {cmd.pos = goes_to(Eigen::Vector3d(0.0,-2.0,-1.3), elapsed_double, 2.0);}
-      else {cmd.pos = Eigen::Vector3d(0.0,-2.0,-1.3);}
+      else if (elapsed_double <= 2.0) {cmd.pos = goes_to(Eigen::Vector3d(0.0,-2.0,-4.0), elapsed_double, 2.0);}
+      else {cmd.pos = Eigen::Vector3d(0.0,-2.0,-4.0);}
       cmd.vel = Eigen::Vector3d::Zero(); // not-use velocity command
       cmd.acc = Eigen::Vector3d::Zero(); // not-use velocity command
 
@@ -351,10 +351,6 @@ int main() {
       // [GAC flight] or [solve failed timeout] or [cannot make_feasible]
       if (!mpc_applied) { 
         cmd.d_theta *= param::GOES_2_ZERO_A;
-        cmd.r1 = param::GOES_2_ZERO_A*cmd.r1 + param::GOES_2_ZERO_B*param::r1_init;
-        cmd.r2 = param::GOES_2_ZERO_A*cmd.r2 + param::GOES_2_ZERO_B*param::r2_init;
-        cmd.r3 = param::GOES_2_ZERO_A*cmd.r3 + param::GOES_2_ZERO_B*param::r3_init;
-        cmd.r4 = param::GOES_2_ZERO_A*cmd.r4 + param::GOES_2_ZERO_B*param::r4_init; 
         l_mpc_output.x_stage.setZero();
         l_mpc_output.u_stage.setZero();
       }
@@ -417,7 +413,7 @@ int main() {
       const Eigen::Matrix3d Rd = R_raw * Et.transpose();
       const Eigen::Vector3d Wd = Et * omega_raw;
       const Eigen::Vector3d Wd_dot = Et * alpha_raw;
-      const Eigen::Vector3d tau_des = geometry_ctrl.attitude_control(Rd, Wd, Wd_dot);
+      const Eigen::Vector3d tau_des = geometry_ctrl.attitude_control(R_raw, Wd, Wd_dot);
       prev_tau = tau_des + s.d_hat;
       if (auto_phase_started && elapsed_double >= param::BUILD_TIME+0.05) {s.d_hat = dob_update(euler_rpy, tau_des, dob_state);}
 
@@ -425,7 +421,7 @@ int main() {
       Eigen::Vector4d thrust_des   = Eigen::Vector4d::Zero(); // (f_1234 > 0)
       Eigen::Vector4d tilt_ang_des = Eigen::Vector4d::Zero();
       Sequential_Allocation(f_sum, tau_des, cmd.tauz_bar, delayed_s.arm_q, s.r_com, thrust_des, tilt_ang_des);
-      // GD::arm_cmd(s, cmd, tilt_ang_des, thrust_des);
+      if (AUTO_PHASE ==  Phase::GAC_ONLY && elapsed_double < param::BUILD_TIME) GD::arm_cmd(s, cmd, tilt_ang_des, thrust_des);
 
       // // --- (Normal) Control Allocation ---
       // Eigen::Vector4d thrust_des   = Eigen::Vector4d::Zero(); // (f_1234 > 0)

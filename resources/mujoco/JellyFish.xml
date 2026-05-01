@@ -49,12 +49,12 @@
       <site name="imu" pos="0 0 0" quat="1 0 0 0"/>
       <geom class="collision" size="0.12 0.12 .02" pos="0 0 0" contype="1" conaffinity="2"/>
 
-      <body name="bong" pos="0.0 0.215 -0.05">
+      <body name="bong" pos="0.0 0.16 -0.05">
        <inertial pos="0 0 0" mass="0.575" diaginertia="0.0089029 0.0002156 0.0090323"/>
-       <geom type="box" size="0.03 0.215 0.015" rgba="0.792157 0.819608 0.933333 1" contype="0" conaffinity="0"/>
+       <geom type="box" size="0.02 0.16 0.01" rgba="0.792157 0.819608 0.933333 1" contype="0" conaffinity="0"/>
 
        <!-- Hidden payload. Runtime-enabled in main.cpp at auto phase start. -->
-       <body name="bong_tip_load" pos="0.0 0.215 -0.11">
+       <body name="bong_tip_load" pos="0.0 0.16 -0.11">
         <inertial pos="0 0 0" mass="1e-9" diaginertia="1e-12 1e-12 1e-12"/>
         <geom name="bong_tip_load_geom" type="box" size="0.125 0.170 0.105" rgba="0.55 0.36 0.18 1" contype="0" conaffinity="0"/>
         </body>

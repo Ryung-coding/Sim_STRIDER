@@ -114,8 +114,8 @@ inline constexpr std::size_t MPC_NP      = 28; // This value must be same as >> 
 inline constexpr std::chrono::steady_clock::duration MPC_TIMEOUT_DURATUION = std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(static_cast<double>(N_STEPS_REQ-1) * MPC_STEP_DT));
 
 // ===== gradient descent parameters =====
-inline constexpr double ARM_OPT_BETA1    = 0.0100;                   // η ascent rate
-inline constexpr double ARM_OPT_BETA2    = 0.0025;                  // C ascent rate
+inline constexpr double ARM_OPT_BETA1    = 0.01;                   // η ascent rate
+inline constexpr double ARM_OPT_BETA2    = 0.01;                  // C ascent rate
 inline constexpr double ARM_OPT_EPS      = 1e-4;                   // finite difference step
 
 inline constexpr double POWER_GAMMA      = 10.000;                 // loss factor

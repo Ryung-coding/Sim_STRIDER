@@ -158,6 +158,7 @@ static inline void circle_pva(double t_sec, Eigen::Vector3d& p_d, Eigen::Vector3
 static inline void l_traj_pva(double t_sec, Eigen::Vector3d& p_d, Eigen::Vector3d& v_d, Eigen::Vector3d& a_d) {
   constexpr double lx_ = 0.0;              // width in X [m]
   constexpr double ly_ = 2.0;              // width in Y [m]
+  constexpr double lz_ = 4.0;              // width in Y [m]
   constexpr double T_  = 2.5;             // base period [sec]
   constexpr double f   = 2.0 * M_PI / T_;  // [rad/s]
 
@@ -170,7 +171,7 @@ static inline void l_traj_pva(double t_sec, Eigen::Vector3d& p_d, Eigen::Vector3
     const double s  = std::sin(f * u);
     const double c  = std::cos(f * u);
 
-    p_d = Eigen::Vector3d(-lx_ * c, -ly_ * c, -1.3);
+    p_d = Eigen::Vector3d(-lx_ * c, -ly_ * c, -lz_);
     v_d = Eigen::Vector3d( lx_ * f * s,  ly_ * f * s, 0.0);
     a_d = Eigen::Vector3d( lx_ * f * f * c, ly_ * f * f * c, 0.0);
     return;
@@ -178,7 +179,7 @@ static inline void l_traj_pva(double t_sec, Eigen::Vector3d& p_d, Eigen::Vector3
 
   // 0.5T ~ 3.0T : hold at (+lx, +ly)
   if (tau > 0.5 * T_ && tau <= 3.0 * T_) {
-    p_d = Eigen::Vector3d(lx_, ly_, -1.3);
+    p_d = Eigen::Vector3d(lx_, ly_, -lz_);
     v_d = Eigen::Vector3d::Zero();
     a_d = Eigen::Vector3d::Zero();
     return;
@@ -190,14 +191,14 @@ static inline void l_traj_pva(double t_sec, Eigen::Vector3d& p_d, Eigen::Vector3
     const double s  = std::sin(f * u);
     const double c  = std::cos(f * u);
 
-    p_d = Eigen::Vector3d(lx_ * c, ly_ * c, -1.3);
+    p_d = Eigen::Vector3d(lx_ * c, ly_ * c, -lz_);
     v_d = Eigen::Vector3d(-lx_ * f * s, -ly_ * f * s, 0.0);
     a_d = Eigen::Vector3d(-lx_ * f * f * c, -ly_ * f * f * c, 0.0);
     return;
   }
 
   // 3.5T ~ 6.0T : hold at (-lx, -ly)
-  p_d = Eigen::Vector3d(-lx_, -ly_, -1.3);
+  p_d = Eigen::Vector3d(-lx_, -ly_, -lz_);
   v_d = Eigen::Vector3d::Zero();
   a_d = Eigen::Vector3d::Zero();
 }
