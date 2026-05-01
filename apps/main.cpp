@@ -233,7 +233,7 @@ int main() {
 
       Phase requested_phase = static_cast<Phase>(g_phase_cmd.load(std::memory_order_relaxed));
 
-      if (!auto_phase_started && elapsed_double >= 15.05) {
+      if (!auto_phase_started && elapsed_double >= 43.0) {
         {
           std::lock_guard<std::mutex> scene_lk(scene_mtx);
           set_bong_tip_load_enabled(m, d, bong_tip_load_body_id, bong_tip_load_geom_id, true);
@@ -283,9 +283,9 @@ int main() {
       // }
 
       // --- position control ---
-      if (elapsed_double >= 14.0) {l_traj_pva(elapsed_double+13.05, cmd.pos, cmd.vel, cmd.acc);} // option: [fig8_point_pva/circle_pva/l_traj_pva]
-      else if (elapsed_double <= 2.0) {cmd.pos = goes_to(Eigen::Vector3d(-1.2,0.0,-1.3), elapsed_double, 2.0);}
-      else {cmd.pos = Eigen::Vector3d(-1.2,0.0,-1.3);}
+      // if (elapsed_double >= 43.0) {l_traj_pva(elapsed_double+45+12.05, cmd.pos, cmd.vel, cmd.acc);} // option: [fig8_point_pva/circle_pva/l_traj_pva]
+      // else if (elapsed_double <= 2.0) {cmd.pos = goes_to(Eigen::Vector3d(0.0,-2.0,-1.3), elapsed_double, 2.0);}
+      cmd.pos = Eigen::Vector3d(0,0,-1.3);
       cmd.vel = Eigen::Vector3d::Zero(); // not-use velocity command
       cmd.acc = Eigen::Vector3d::Zero(); // not-use velocity command
 
@@ -339,10 +339,10 @@ int main() {
             cmd.d_theta = l_mpc_output.u_stage.col(idx).segment<3>(0);
             std::array<Eigen::Vector2d, 4> r; // cartesian opt r_cmd
             polar2cart(opt_r[0], opt_r[1], opt_r[2], opt_r[3], r[0], r[1], r[2], r[3]);
-            cmd.r1 = opt_r[0];
-            cmd.r2 = opt_r[1];
-            cmd.r3 = opt_r[2];
-            cmd.r4 = opt_r[3];
+            cmd.r1 = 0.9 * cmd.r1 + 0.1 * opt_r[0];
+            cmd.r2 = 0.9 * cmd.r2 + 0.1 * opt_r[1];
+            cmd.r3 = 0.9 * cmd.r3 + 0.1 * opt_r[2];
+            cmd.r4 = 0.9 * cmd.r4 + 0.1 * opt_r[3];
             mpc_applied = true;
           }
         }
@@ -350,10 +350,6 @@ int main() {
       // [GAC flight] or [solve failed timeout] or [cannot make_feasible]
       if (!mpc_applied) { 
         cmd.d_theta *= param::GOES_2_ZERO_A;
-        cmd.r1 = param::GOES_2_ZERO_A*cmd.r1 + param::GOES_2_ZERO_B*param::r1_init;
-        cmd.r2 = param::GOES_2_ZERO_A*cmd.r2 + param::GOES_2_ZERO_B*param::r2_init;
-        cmd.r3 = param::GOES_2_ZERO_A*cmd.r3 + param::GOES_2_ZERO_B*param::r3_init;
-        cmd.r4 = param::GOES_2_ZERO_A*cmd.r4 + param::GOES_2_ZERO_B*param::r4_init; 
         l_mpc_output.x_stage.setZero();
         l_mpc_output.u_stage.setZero();
       }
@@ -424,6 +420,8 @@ int main() {
       Eigen::Vector4d thrust_des   = Eigen::Vector4d::Zero(); // (f_1234 > 0)
       Eigen::Vector4d tilt_ang_des = Eigen::Vector4d::Zero();
       Sequential_Allocation(f_sum, tau_des, cmd.tauz_bar, delayed_s.arm_q, s.r_com, thrust_des, tilt_ang_des);
+      
+      // GD_arm_cmd(s, cmd, tilt_ang_des, thrust_des);
 
       // // --- (Normal) Control Allocation ---
       // Eigen::Vector4d thrust_des   = Eigen::Vector4d::Zero(); // (f_1234 > 0)
@@ -458,9 +456,10 @@ int main() {
 
       // --- virtual thrust clipping (tightening starts at 10s, finishes at 15s)---
       double thrust_sat = 1e12;
-      if (elapsed_double >= 15.0)      {thrust_sat = param::SATURATION_THRUST;}
-      else if (elapsed_double >= 10.0) {thrust_sat = param::SATURATION_THRUST + (1.0 - 0.2*param::CTRL_DT) * 5.0;}
-      else                             {thrust_sat = param::SATURATION_THRUST + 5.0;}
+      thrust_sat = param::SATURATION_THRUST;
+      // if (elapsed_double >= 15.0)      {thrust_sat = param::SATURATION_THRUST;}
+      // else if (elapsed_double >= 10.0) {thrust_sat = param::SATURATION_THRUST + (1.0 - 0.2*param::CTRL_DT) * 5.0;}
+      // else                             {thrust_sat = param::SATURATION_THRUST + 5.0;}
       for (uint8_t i=0; i<4; ++i) {smoothed_F(i) = (smoothed_F(i) > thrust_sat) ? thrust_sat : smoothed_F(i);}
 
       // --- Step simulation at SIM_HZ using ZOH ---

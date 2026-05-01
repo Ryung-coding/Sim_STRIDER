@@ -45,11 +45,10 @@ inline constexpr double kIX = 0.3;  /**< Position integral gains */
 inline constexpr double J[9] = {0.27, 0.00, 0.00,
                                 0.00, 0.49, 0.00,
                                 0.00, 0.00, 0.76};
-inline constexpr double M  = 6.8;
+inline constexpr double M  = 9.575;
 inline constexpr double G  = 9.80665;
 
-inline constexpr double VIRTUAL_MARGIN    = 3.0; // thrust margin of each thruster [N]
-inline constexpr double SATURATION_THRUST = M * G / 4.0 + VIRTUAL_MARGIN;
+inline constexpr double SATURATION_THRUST = 30.0;
 
 // Allocation parameters
 inline constexpr double SERVO_DELAY_ALPHA = 0.093158;  // yaw trimming
@@ -112,10 +111,18 @@ inline constexpr std::size_t MPC_NU      = 11; // This value must be same as >> 
 inline constexpr std::size_t MPC_NP      = 28; // This value must be same as >> self.use_full_np << on solver.py
 inline constexpr std::chrono::steady_clock::duration MPC_TIMEOUT_DURATUION = std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(static_cast<double>(N_STEPS_REQ-1) * MPC_STEP_DT));
 
+// ===== gradient descent parameters =====
+inline constexpr double ARM_OPT_BETA1    = 0.01;                   // η ascent rate
+inline constexpr double ARM_OPT_BETA2    = 0.001;                  // C ascent rate
+inline constexpr double ARM_OPT_EPS      = 1e-4;                   // finite difference step
+
+inline constexpr double POWER_GAMMA      = 10.000;                 // loss factor
+inline constexpr double AIR_DENSITY      = 1.225;                  // kg/m³ 
+inline constexpr double PROP_DISK_AREA   = M_PI * 0.1524 * 0.1524; // 12-inch prop radius = 0.1524m 
+
 // ===== MuJoCo added mass parameters =====
-static constexpr mjtNum BONG_TIP_LOAD_MASS = 0.4;
-static constexpr mjtNum BONG_TIP_LOAD_RADIUS = 0.03;
-static constexpr mjtNum BONG_TIP_LOAD_INERTIA = 1.44 * 1e-4;
+static constexpr mjtNum BONG_TIP_LOAD_MASS =0.43;
+static constexpr mjtNum BONG_TIP_LOAD_INERTIA = 0.215*0.215*0.43;
 
 // ===== MuJoCo viewer parameters =====
 inline constexpr double PATH_SEC = 10.0;   // history length [sec]

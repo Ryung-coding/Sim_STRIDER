@@ -156,8 +156,8 @@ static inline void circle_pva(double t_sec, Eigen::Vector3d& p_d, Eigen::Vector3
 }
 
 static inline void l_traj_pva(double t_sec, Eigen::Vector3d& p_d, Eigen::Vector3d& v_d, Eigen::Vector3d& a_d) {
-  constexpr double lx_ = 1.2;              // width in X [m]
-  constexpr double ly_ = 0.0;              // width in Y [m]
+  constexpr double lx_ = 0.0;              // width in X [m]
+  constexpr double ly_ = 2.0;              // width in Y [m]
   constexpr double T_  = 2.5;             // base period [sec]
   constexpr double f   = 2.0 * M_PI / T_;  // [rad/s]
 
@@ -470,6 +470,24 @@ static inline void cart2polar(const Eigen::Vector3d& r1, const Eigen::Vector3d& 
   }
 }
 
+static inline Eigen::Vector2d cart2polar(const Eigen::Vector2d& cart, const int a) {
+  constexpr double eps = 1e-12;
+  const double dx = cart(0) - param::B2BASE_X[a];
+  const double dy = cart(1) - param::B2BASE_Y[a];
+
+  const double rho = std::sqrt(dx * dx + dy * dy);
+  double alpha = (rho > eps) ? std::atan2(dy, dx) : 0.0;
+
+  alpha = spin_360(alpha, param::ALPHA_MIN[a], param::ALPHA_MAX[a]);
+
+  return Eigen::Vector2d(rho, alpha);
+}
+
+static inline Eigen::Vector2d cart2polar(const Eigen::Vector3d& cart, const int a) {
+  const Eigen::Vector2d xy = cart.head<2>();
+  return cart2polar(xy, a);
+}
+
 static inline void polar2cart(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2, const Eigen::Vector2d& p3, const Eigen::Vector2d& p4, Eigen::Vector2d& r1, Eigen::Vector2d& r2, Eigen::Vector2d& r3, Eigen::Vector2d& r4) {
   const Eigen::Vector2d* polar[4] = {&p1, &p2, &p3, &p4};
   Eigen::Vector2d* cart[4] = {&r1, &r2, &r3, &r4};
@@ -480,6 +498,13 @@ static inline void polar2cart(const Eigen::Vector2d& p1, const Eigen::Vector2d& 
     (*cart[a])(0) = param::B2BASE_X[a] + rho * std::cos(alpha);
     (*cart[a])(1) = param::B2BASE_Y[a] + rho * std::sin(alpha);
   }
+}
+
+static inline Eigen::Vector2d polar2cart(const Eigen::Vector2d& polar, const int a) {
+  const double rho   = polar(0);
+  const double alpha = polar(1);
+
+  return Eigen::Vector2d(param::B2BASE_X[a] + rho * std::cos(alpha), param::B2BASE_Y[a] + rho * std::sin(alpha));
 }
 
 static inline bool make_feasible(std::array<Eigen::Vector2d, 4>& r) {
@@ -809,6 +834,170 @@ static inline Eigen::Vector3d Forward_Allocate(const Eigen::Vector4d& F1234, con
   A(2,2) = -param::PWM_ZETA;
   A(2,3) =  param::PWM_ZETA;
   return A * F1234;
+}
+
+// Utilities for gradient descent
+static inline Eigen::Vector2d estimate_CoM_Hover(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2, const Eigen::Vector2d& p3, const Eigen::Vector2d& p4, const Eigen::Vector4d& thrust_des) {
+
+  const double sum_f = thrust_des.sum();
+  if (std::abs(sum_f) < 1e-6) return (p1 + p2 + p3 + p4) * 0.25;
+
+  Eigen::Vector2d CoM;
+  CoM(0) = (p1(0)*thrust_des(0) + p2(0)*thrust_des(1) + p3(0)*thrust_des(2) + p4(0)*thrust_des(3)) / sum_f;
+  CoM(1) = (p1(1)*thrust_des(0) + p2(1)*thrust_des(1) + p3(1)*thrust_des(2) + p4(1)*thrust_des(3)) / sum_f;
+
+  return CoM;
+}
+
+static inline bool build_A1_matrix(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2, const Eigen::Vector2d& p3, const Eigen::Vector2d& p4, const Eigen::Vector3d& Pc, const Eigen::Vector4d& tilt_des, Eigen::Matrix4d& A1_out) {
+
+  const double pcx = Pc(0), pcy = Pc(1);
+  const double s1 = std::sin(tilt_des(0)), c1 = std::cos(tilt_des(0));
+  const double s2 = std::sin(tilt_des(1)), c2 = std::cos(tilt_des(1));
+  const double s3 = std::sin(tilt_des(2)), c3 = std::cos(tilt_des(2));
+  const double s4 = std::sin(tilt_des(3)), c4 = std::cos(tilt_des(3));
+
+  A1_out(0,0) = -inv_sqrt2*param::PWM_ZETA*s1 + (pcy - p1(1))*c1;
+  A1_out(0,1) = -inv_sqrt2*param::PWM_ZETA*s2 + (pcy - p2(1))*c2;
+  A1_out(0,2) = -inv_sqrt2*param::PWM_ZETA*s3 + (pcy - p3(1))*c3;
+  A1_out(0,3) = -inv_sqrt2*param::PWM_ZETA*s4 + (pcy - p4(1))*c4;
+  A1_out(1,0) = -inv_sqrt2*param::PWM_ZETA*s1 + (p1(0) - pcx)*c1;
+  A1_out(1,1) = -inv_sqrt2*param::PWM_ZETA*s2 + (p2(0) - pcx)*c2;
+  A1_out(1,2) = -inv_sqrt2*param::PWM_ZETA*s3 + (p3(0) - pcx)*c3;
+  A1_out(1,3) = -inv_sqrt2*param::PWM_ZETA*s4 + (p4(0) - pcx)*c4;
+  A1_out(2,0) = -param::PWM_ZETA * c1;
+  A1_out(2,1) =  param::PWM_ZETA * c2;
+  A1_out(2,2) = -param::PWM_ZETA * c3;
+  A1_out(2,3) =  param::PWM_ZETA * c4;
+  A1_out(3,0) = -c1;
+  A1_out(3,1) = -c2;
+  A1_out(3,2) = -c3;
+  A1_out(3,3) = -c4;
+
+  return true;
+}
+
+static inline double eta(const Eigen::Matrix4d& A1) {
+
+  Eigen::FullPivLU<Eigen::Matrix4d> lu(A1);
+  if (!lu.isInvertible()) return 0.0;
+
+  // eq.(6): f = A⁻¹·T
+  Eigen::Vector4d T_hover(0.0, 0.0, 0.0, -param::TOTAL_MASS* param::G);
+  Eigen::Vector4d f = lu.solve(T_hover);
+
+  double sum_f = f.sum();
+  double sum_power = 0.0;
+  // std::fprintf(stderr, "%.3f %.3f %.3f %.3f | %.3f\n", f(0), f(1), f(2), f(3), f.sum());
+
+  for (int i = 0; i < 4; ++i) {
+    if (f(i) > 0) {
+      // eq.(3): Pᵢ = γ√(fᵢ³/(2ρS))
+      double power_i = param::POWER_GAMMA * std::sqrt(f(i)*f(i)*f(i) / (2.0*param::AIR_DENSITY*param::PROP_DISK_AREA));
+      sum_power += power_i;
+    }
+  }
+
+  // eq.(7): η = Σfᵢ / ΣPᵢ
+  double eta = sum_f / sum_power;
+
+  return eta;
+}
+
+static inline double controllability(const Eigen::Matrix4d& A1) {
+
+  Eigen::FullPivLU<Eigen::Matrix4d> lu(A1);
+  if (!lu.isInvertible()) return 0.0;
+  Eigen::Matrix4d A1inv = lu.inverse();
+
+  const Eigen::Map<const Eigen::Matrix3d> J_full(param::J);
+  Eigen::Matrix<double, 3, 2> J_sub;
+  J_sub << J_full(0,0), -J_full(0,1),
+           J_full(1,0),  J_full(1,1),
+           J_full(2,0), -J_full(2,1);
+
+  double max_norm = 0.0;
+  for (int i = 0; i < 4; ++i) {
+    // eq.(9): Sᵢ = A⁻¹.row(i).segment(1,3) · J_sub
+    Eigen::RowVector3d Gi = A1inv.row(i).segment(1, 3);
+    Eigen::RowVector2d Si = Gi * J_sub;
+    double norm_i = Si.norm();
+    max_norm = std::max(max_norm, norm_i);
+  }
+
+  // eq.(8): C = 1 / maxᵢ(‖Sᵢ‖)
+  double C = 1.0 / max_norm;
+
+  return C;
+}
+
+static inline void gradients(Eigen::Vector2d& p1, Eigen::Vector2d& p2, Eigen::Vector2d& p3, Eigen::Vector2d& p4, const Eigen::Vector3d& Pc, const Eigen::Vector4d& tilt_des, Eigen::Matrix<double, 4, 2>& grad_eta_out, Eigen::Matrix<double, 4, 2>& grad_C_out) {
+
+  Eigen::Matrix4d A1_base;
+  build_A1_matrix(p1, p2, p3, p4, Pc, tilt_des, A1_base);
+  const double eta_base = eta(A1_base);
+  const double C_base = controllability(A1_base);
+
+  Eigen::Vector2d* p[4] = {&p1, &p2, &p3, &p4};
+  for (int i = 0; i < 4; ++i) {
+    for (int ax = 0; ax < 2; ++ax) {
+      (*p[i])(ax) += param::ARM_OPT_EPS;
+
+      Eigen::Matrix4d A1_perturbed;
+      build_A1_matrix(p1, p2, p3, p4, Pc, tilt_des, A1_perturbed);
+
+      double eta_perturbed = eta(A1_perturbed);
+      double C_perturbed = controllability(A1_perturbed);
+
+      (*p[i])(ax) -= param::ARM_OPT_EPS;
+
+      grad_eta_out(i, ax) = (eta_perturbed - eta_base) / param::ARM_OPT_EPS;
+      grad_C_out(i, ax) = (C_perturbed - C_base) / param::ARM_OPT_EPS;
+    }
+  }
+}
+
+static inline void GD_arm_cmd(const State& s, Command& cmd, const Eigen::Vector4d& tilt_des, const Eigen::Vector4d& thrust_des) {
+
+  static Eigen::Vector2d p1 = polar2cart(cmd.r1, 0);
+  static Eigen::Vector2d p2 = polar2cart(cmd.r2, 1);
+  static Eigen::Vector2d p3 = polar2cart(cmd.r3, 2);
+  static Eigen::Vector2d p4 = polar2cart(cmd.r4, 3);
+
+  // GD math is all in cartesian
+  const Eigen::Vector2d r_com_xy = estimate_CoM_Hover(p1, p2, p3, p4, thrust_des);
+  const Eigen::Vector3d Pc_hover(r_com_xy(0), r_com_xy(1), s.r_com(2));
+
+  Eigen::Matrix<double, 4, 2> grad_eta, grad_C;
+  gradients(p1, p2, p3, p4, Pc_hover, tilt_des, grad_eta, grad_C);
+
+  double dot_product = 0.0;
+  double norm_eta_sq = 0.0;
+
+  for (int i = 0; i < 4; ++i) {
+    for (int ax = 0; ax < 2; ++ax) {
+      dot_product += grad_C(i, ax) * grad_eta(i, ax);
+      norm_eta_sq += grad_eta(i, ax) * grad_eta(i, ax);
+    }
+  }
+
+  const double proj_scalar = (norm_eta_sq > 1e-12) ? dot_product / norm_eta_sq : 0.0;
+  const Eigen::Matrix<double, 4, 2> grad_C_orth = grad_C - proj_scalar * grad_eta;
+
+  // gradient step in cartesian
+  p1 = p1 + param::ARM_OPT_BETA1 * grad_eta.row(0).transpose() + param::ARM_OPT_BETA2 * grad_C_orth.row(0).transpose();
+  p2 = p2 + param::ARM_OPT_BETA1 * grad_eta.row(1).transpose() + param::ARM_OPT_BETA2 * grad_C_orth.row(1).transpose();
+  p3 = p3 + param::ARM_OPT_BETA1 * grad_eta.row(2).transpose() + param::ARM_OPT_BETA2 * grad_C_orth.row(2).transpose();
+  p4 = p4 + param::ARM_OPT_BETA1 * grad_eta.row(3).transpose() + param::ARM_OPT_BETA2 * grad_C_orth.row(3).transpose();
+
+  std::array<Eigen::Vector2d, 4> feas = {cart2polar(p1, 0), cart2polar(p2, 1), cart2polar(p3, 2), cart2polar(p4, 3)};
+
+  if (make_feasible(feas)) {
+    cmd.r1 = feas[0];
+    cmd.r2 = feas[1];
+    cmd.r3 = feas[2];
+    cmd.r4 = feas[3];
+  }
 }
 
 namespace NOISE {
