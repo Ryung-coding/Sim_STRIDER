@@ -4,6 +4,7 @@
 #include "fdcl_control.hpp"
 #include "utils.hpp"
 #include "gyro_ekf.hpp"
+#include "gradient_descent.hpp"
 
 #include <thread>
 #include <condition_variable>
@@ -233,7 +234,7 @@ int main() {
 
       Phase requested_phase = static_cast<Phase>(g_phase_cmd.load(std::memory_order_relaxed));
 
-      if (!auto_phase_started && elapsed_double >= 15.05) {
+      if (!auto_phase_started && elapsed_double >= param::BUILD_TIME+0.05) {
         {
           std::lock_guard<std::mutex> scene_lk(scene_mtx);
           set_bong_tip_load_enabled(m, d, bong_tip_load_body_id, bong_tip_load_geom_id, true);
@@ -283,7 +284,7 @@ int main() {
       // }
 
       // --- position control ---
-      if (elapsed_double >= 14.0) {l_traj_pva(elapsed_double+13.05, cmd.pos, cmd.vel, cmd.acc);} // option: [fig8_point_pva/circle_pva/l_traj_pva]
+      if (elapsed_double >= param::BUILD_TIME) {l_traj_pva(elapsed_double + std::fmod(12.05 - std::fmod(param::BUILD_TIME, 15.0) + 15.0, 15.0), cmd.pos, cmd.vel, cmd.acc);} // option: [fig8_point_pva/circle_pva/l_traj_pva]
       else if (elapsed_double <= 2.0) {cmd.pos = goes_to(Eigen::Vector3d(-1.2,0.0,-1.3), elapsed_double, 2.0);}
       else {cmd.pos = Eigen::Vector3d(-1.2,0.0,-1.3);}
       cmd.vel = Eigen::Vector3d::Zero(); // not-use velocity command
@@ -418,12 +419,13 @@ int main() {
       const Eigen::Vector3d Wd_dot = Et * alpha_raw;
       const Eigen::Vector3d tau_des = geometry_ctrl.attitude_control(Rd, Wd, Wd_dot);
       prev_tau = tau_des + s.d_hat;
-      if (auto_phase_started && elapsed_double >= 15.05) {s.d_hat = dob_update(euler_rpy, tau_des, dob_state);}
+      if (auto_phase_started && elapsed_double >= param::BUILD_TIME+0.05) {s.d_hat = dob_update(euler_rpy, tau_des, dob_state);}
 
       // --- (Sequential) Control Allocation ---
       Eigen::Vector4d thrust_des   = Eigen::Vector4d::Zero(); // (f_1234 > 0)
       Eigen::Vector4d tilt_ang_des = Eigen::Vector4d::Zero();
       Sequential_Allocation(f_sum, tau_des, cmd.tauz_bar, delayed_s.arm_q, s.r_com, thrust_des, tilt_ang_des);
+      // GD::arm_cmd(s, cmd, tilt_ang_des, thrust_des);
 
       // // --- (Normal) Control Allocation ---
       // Eigen::Vector4d thrust_des   = Eigen::Vector4d::Zero(); // (f_1234 > 0)
@@ -458,9 +460,10 @@ int main() {
 
       // --- virtual thrust clipping (tightening starts at 10s, finishes at 15s)---
       double thrust_sat = 1e12;
-      if (elapsed_double >= 15.0)      {thrust_sat = param::SATURATION_THRUST;}
+      if (elapsed_double >= param::BUILD_TIME)      {thrust_sat = param::SATURATION_THRUST;}
       else if (elapsed_double >= 10.0) {thrust_sat = param::SATURATION_THRUST + (1.0 - 0.2*param::CTRL_DT) * 5.0;}
       else                             {thrust_sat = param::SATURATION_THRUST + 5.0;}
+      // double thrust_sat = param::SATURATION_THRUST;
       for (uint8_t i=0; i<4; ++i) {smoothed_F(i) = (smoothed_F(i) > thrust_sat) ? thrust_sat : smoothed_F(i);}
 
       // --- Step simulation at SIM_HZ using ZOH ---
