@@ -177,7 +177,7 @@ int main() {
 
     // --- auto-phase start ---
     bool auto_phase_started = false;
-    constexpr Phase AUTO_PHASE = Phase::USE_FULL; // choose GAC_ONLY or USE_ARM or USE_DTHETA or USE_FULL
+    constexpr Phase AUTO_PHASE = Phase::GAC_ONLY; // choose GAC_ONLY or USE_FULL
 
     // --- MRG parameters ---
     uint32_t mpc_key = 1;
@@ -390,11 +390,6 @@ int main() {
             // g_mpc_input.p(m++) = -f_sum; // positive, f_sum(24)
             g_mpc_input.p(m++) = std::clamp(-f_sum, 4.0*param::PWM_B, 4.0*(param::SATURATION_THRUST-0.3)); // positive, f_sum(24)
             g_mpc_input.p(m++) = s.d_hat(0); g_mpc_input.p(m++) = s.d_hat(1); g_mpc_input.p(m++) = s.d_hat(2); // disturbance torque(25~27)
-
-            if (phase==Phase::USE_FULL)        {g_mpc_input.use_delta = true;  g_mpc_input.use_arm = true; }
-            else if (phase==Phase::USE_DTHETA) {g_mpc_input.use_delta = true;  g_mpc_input.use_arm = false;}
-            else if (phase==Phase::USE_ARM)    {g_mpc_input.use_delta = false; g_mpc_input.use_arm = true; }
-            else                               {g_mpc_input.use_delta = false; g_mpc_input.use_arm = false;}
 
             g_mpc_input.steps_req = param::N_STEPS_REQ;
             g_mpc_input.t = now;

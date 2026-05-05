@@ -93,7 +93,7 @@ inline constexpr double TOTAL_MASS   = CENTER_MASS + 4.0*(LINK_MASS[0]+LINK_MASS
 inline constexpr double LINK_COM_DIST[5] = {-0.040, -0.031, -0.055, -0.012, -0.020};     // link com distance [m]
 
 // ===== MPC parameters  =====
-inline constexpr double BUILD_TIME       = 43.0; // BUILD_TIME > 15.0 | my COM 43.0
+inline constexpr double BUILD_TIME       = 10.0; // BUILD_TIME > 15.0 | my COM 21.0
 inline constexpr double ARM_DELAY_TAU    = 0.03; // MuJoCo actuator delay [sec]
 inline const     double ARM_DELAY_ALPHA  = std::exp(-CTRL_DT / ARM_DELAY_TAU); // not a tunable parameter
 inline const     double ARM_DELAY_BETA   = 1.0 - ARM_DELAY_ALPHA;              // not a tunable parameter

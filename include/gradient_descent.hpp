@@ -9,12 +9,24 @@
  * USAGE
  * -----
  *   1. Add the required parameters to your params.hpp (see below).
+ * 
+        // ===== gradient descent parameters =====
+        inline constexpr double ARM_OPT_BETA1    = 0.01;                   // η ascent rate
+        inline constexpr double ARM_OPT_BETA2    = 0.01;                  // C ascent rate
+        inline constexpr double ARM_OPT_EPS      = 1e-4;                   // finite difference step
+
+        inline constexpr double POWER_GAMMA      = 10.000;                 // loss factor
+        inline constexpr double AIR_DENSITY      = 1.225;                  // kg/m³ 
+        inline constexpr double PROP_DISK_AREA   = M_PI * 0.1524 * 0.1524; // 12-inch prop radius = 0.1524m 
+
  *   2. #include "gradient_descent.hpp" after params.hpp and utils.hpp.
- *   3. Call  GD::arm_cmd(s, cmd, tilt_des, thrust_des)  every control tick.
+ *   3. Call  GD::arm_cmd(s, cmd, tilt_des, thrust_des) !! in "main.cpp" 416~419 line
+ *      Eigen::Vector4d thrust_des   = Eigen::Vector4d::Zero(); // (f_1234 > 0)
+ *      Eigen::Vector4d tilt_ang_des = Eigen::Vector4d::Zero();
+ *      Sequential_Allocation(f_sum, tau_des, cmd.tauz_bar, delayed_s.arm_q, s.r_com, thrust_des, tilt_ang_des);
+ *      if (AUTO_PHASE ==  Phase::GAC_ONLY && elapsed_double < param::BUILD_TIME) GD::arm_cmd(s, cmd, tilt_ang_des, thrust_des); <--------this part!!
  *
- * Required params (add to namespace param if missing):
- *   ARM_OPT_BETA1, ARM_OPT_BETA2, ARM_OPT_EPS
- *   POWER_GAMMA, AIR_DENSITY, PROP_DISK_AREA
+ *
  */
 
 #ifndef GRADIENT_DESCENT_HPP
@@ -27,21 +39,18 @@
 
 namespace GD {
 
-// ============================================================================
-//  Internal polar <-> cartesian helpers  (single-rotor versions)
-//  These do NOT depend on any external overload in utils.hpp.
-// ============================================================================
 static inline Eigen::Vector2d polar_to_cart(const Eigen::Vector2d& polar, int arm_idx) {
+
   const double rho   = polar(0);
   const double alpha = polar(1);
-  return Eigen::Vector2d(
-    param::B2BASE_X[arm_idx] + rho * std::cos(alpha),
-    param::B2BASE_Y[arm_idx] + rho * std::sin(alpha)
-  );
+
+  return Eigen::Vector2d(param::B2BASE_X[arm_idx] + rho * std::cos(alpha), param::B2BASE_Y[arm_idx] + rho * std::sin(alpha));
 }
 
 static inline Eigen::Vector2d cart_to_polar(const Eigen::Vector2d& cart, int arm_idx) {
+
   constexpr double eps = 1e-12;
+
   const double dx = cart(0) - param::B2BASE_X[arm_idx];
   const double dy = cart(1) - param::B2BASE_Y[arm_idx];
 
@@ -53,16 +62,9 @@ static inline Eigen::Vector2d cart_to_polar(const Eigen::Vector2d& cart, int arm
   return Eigen::Vector2d(rho, alpha);
 }
 
-// ============================================================================
-//  A1 matrix construction  (allocation matrix)
-// ============================================================================
-static inline bool build_A1_matrix(
-    const Eigen::Vector2d& p1, const Eigen::Vector2d& p2,
-    const Eigen::Vector2d& p3, const Eigen::Vector2d& p4,
-    const Eigen::Vector3d& Pc,
-    const Eigen::Vector4d& tilt_des,
-    Eigen::Matrix4d& A1_out)
-{
+static inline bool build_A1_matrix(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2,       const Eigen::Vector2d& p3,    const Eigen::Vector2d& p4,
+                                   const Eigen::Vector3d& Pc, const Eigen::Vector4d& tilt_des, Eigen::Matrix4d&       A1_out) {
+
   const double pcx = Pc(0), pcy = Pc(1);
   const double s1 = std::sin(tilt_des(0)), c1 = std::cos(tilt_des(0));
   const double s2 = std::sin(tilt_des(1)), c2 = std::cos(tilt_des(1));
@@ -92,10 +94,9 @@ static inline bool build_A1_matrix(
   return true;
 }
 
-// ============================================================================
-//  η (energy efficiency)  — eq.(7)
-// ============================================================================
 static inline double eta(const Eigen::Matrix4d& A1) {
+
+  //  η (energy efficiency)  — eq.(7)
   Eigen::FullPivLU<Eigen::Matrix4d> lu(A1);
   if (!lu.isInvertible()) return 0.0;
 
@@ -107,8 +108,7 @@ static inline double eta(const Eigen::Matrix4d& A1) {
 
   for (int i = 0; i < 4; ++i) {
     if (f(i) > 0) {
-      double power_i = param::POWER_GAMMA *
-          std::sqrt(f(i)*f(i)*f(i) / (2.0 * param::AIR_DENSITY * param::PROP_DISK_AREA));
+      double power_i = param::POWER_GAMMA * std::sqrt(f(i)*f(i)*f(i) / (2.0 * param::AIR_DENSITY * param::PROP_DISK_AREA));
       sum_power += power_i;
     }
   }
@@ -116,10 +116,9 @@ static inline double eta(const Eigen::Matrix4d& A1) {
   return (sum_power > 0.0) ? sum_f / sum_power : 0.0;
 }
 
-// ============================================================================
-//  C (controllability)  — eq.(8)
-// ============================================================================
 static inline double controllability(const Eigen::Matrix4d& A1) {
+
+  //  C (controllability)  — eq.(8)
   Eigen::FullPivLU<Eigen::Matrix4d> lu(A1);
   if (!lu.isInvertible()) return 0.0;
 
@@ -141,36 +140,21 @@ static inline double controllability(const Eigen::Matrix4d& A1) {
   return (max_norm > 0.0) ? 1.0 / max_norm : 0.0;
 }
 
-// ============================================================================
-//  Hover CoM estimation (thrust-weighted centroid)
-// ============================================================================
-static inline Eigen::Vector2d estimate_CoM_Hover(
-    const Eigen::Vector2d& p1, const Eigen::Vector2d& p2,
-    const Eigen::Vector2d& p3, const Eigen::Vector2d& p4,
-    const Eigen::Vector4d& thrust_des)
-{
+static inline Eigen::Vector2d estimate_CoM_Hover(const Eigen::Vector2d& p1, const Eigen::Vector2d& p2, const Eigen::Vector2d& p3, const Eigen::Vector2d& p4, const Eigen::Vector4d& thrust_des) {
   const double sum_f = thrust_des.sum();
   if (std::abs(sum_f) < 1e-6) return (p1 + p2 + p3 + p4) * 0.25;
 
   Eigen::Vector2d CoM;
-  CoM(0) = (p1(0)*thrust_des(0) + p2(0)*thrust_des(1) +
-            p3(0)*thrust_des(2) + p4(0)*thrust_des(3)) / sum_f;
-  CoM(1) = (p1(1)*thrust_des(0) + p2(1)*thrust_des(1) +
-            p3(1)*thrust_des(2) + p4(1)*thrust_des(3)) / sum_f;
+  CoM(0) = (p1(0)*thrust_des(0) + p2(0)*thrust_des(1) + p3(0)*thrust_des(2) + p4(0)*thrust_des(3)) / sum_f;
+  CoM(1) = (p1(1)*thrust_des(0) + p2(1)*thrust_des(1) + p3(1)*thrust_des(2) + p4(1)*thrust_des(3)) / sum_f;
+
   return CoM;
 }
 
-// ============================================================================
-//  Numerical gradients  ∇η, ∇C  (finite differences)
-// ============================================================================
-static inline void gradients(
-    Eigen::Vector2d& p1, Eigen::Vector2d& p2,
-    Eigen::Vector2d& p3, Eigen::Vector2d& p4,
-    const Eigen::Vector3d& Pc,
-    const Eigen::Vector4d& tilt_des,
-    Eigen::Matrix<double, 4, 2>& grad_eta_out,
-    Eigen::Matrix<double, 4, 2>& grad_C_out)
-{
+static inline void gradients(Eigen::Vector2d&             p1,           Eigen::Vector2d&             p2,       Eigen::Vector2d& p3, Eigen::Vector2d& p4,
+                             const Eigen::Vector3d&       Pc,           const Eigen::Vector4d&       tilt_des,
+                             Eigen::Matrix<double, 4, 2>& grad_eta_out, Eigen::Matrix<double, 4, 2>& grad_C_out) {
+
   Eigen::Matrix4d A1_base;
   build_A1_matrix(p1, p2, p3, p4, Pc, tilt_des, A1_base);
   const double eta_base = eta(A1_base);
@@ -188,37 +172,23 @@ static inline void gradients(
       const double C_pert   = controllability(A1_perturbed);
 
       (*p[i])(ax) -= param::ARM_OPT_EPS;
-
+      //  Numerical gradients  ∇η, ∇C  (finite differences)
       grad_eta_out(i, ax) = (eta_pert - eta_base) / param::ARM_OPT_EPS;
       grad_C_out(i, ax)   = (C_pert   - C_base)   / param::ARM_OPT_EPS;
     }
   }
 }
 
-// ============================================================================
-//  Main entry point: one gradient-descent step per control tick
-//  θ_{k+1} = θ_k + β₁·∇η + β₂·(∇C − proj_{∇η}∇C)       — eq.(10)
-//
-//  cmd.r1~r4 : Vector2d (rho, alpha) polar coordinates
-//  s.r_com   : Vector3d (x, y, z) estimated CoM
-// ============================================================================
-static inline void arm_cmd(
-    const State&           s,
-    Command&               cmd,
-    const Eigen::Vector4d& tilt_des,
-    const Eigen::Vector4d& thrust_des)
-{
-  // Persistent cartesian positions (survive between ticks)
+static inline void arm_cmd(const State& s, Command& cmd, const Eigen::Vector4d& tilt_des, const Eigen::Vector4d& thrust_des) {
+
   static Eigen::Vector2d p1 = polar_to_cart(cmd.r1, 0);
   static Eigen::Vector2d p2 = polar_to_cart(cmd.r2, 1);
   static Eigen::Vector2d p3 = polar_to_cart(cmd.r3, 2);
   static Eigen::Vector2d p4 = polar_to_cart(cmd.r4, 3);
 
-  // GD math is all in cartesian
   const Eigen::Vector2d r_com_xy = estimate_CoM_Hover(p1, p2, p3, p4, thrust_des);
   const Eigen::Vector3d Pc_hover(r_com_xy(0), r_com_xy(1), s.r_com(2));
 
-  // --- compute gradients ---
   Eigen::Matrix<double, 4, 2> grad_eta, grad_C;
   gradients(p1, p2, p3, p4, Pc_hover, tilt_des, grad_eta, grad_C);
 
@@ -233,21 +203,14 @@ static inline void arm_cmd(
   const double proj_scalar = (norm_eta_sq > 1e-12) ? dot_product / norm_eta_sq : 0.0;
   const Eigen::Matrix<double, 4, 2> grad_C_orth = grad_C - proj_scalar * grad_eta;
 
-  // --- gradient step in cartesian ---
-  p1 += param::ARM_OPT_BETA1 * grad_eta.row(0).transpose()
-      + param::ARM_OPT_BETA2 * grad_C_orth.row(0).transpose();
-  p2 += param::ARM_OPT_BETA1 * grad_eta.row(1).transpose()
-      + param::ARM_OPT_BETA2 * grad_C_orth.row(1).transpose();
-  p3 += param::ARM_OPT_BETA1 * grad_eta.row(2).transpose()
-      + param::ARM_OPT_BETA2 * grad_C_orth.row(2).transpose();
-  p4 += param::ARM_OPT_BETA1 * grad_eta.row(3).transpose()
-      + param::ARM_OPT_BETA2 * grad_C_orth.row(3).transpose();
+  //  θ_{k+1} = θ_k + β₁·∇η + β₂·(∇C − proj_{∇η}∇C)       — eq.(10)
+  p1 += param::ARM_OPT_BETA1 * grad_eta.row(0).transpose() + param::ARM_OPT_BETA2 * grad_C_orth.row(0).transpose();
+  p2 += param::ARM_OPT_BETA1 * grad_eta.row(1).transpose() + param::ARM_OPT_BETA2 * grad_C_orth.row(1).transpose();
+  p3 += param::ARM_OPT_BETA1 * grad_eta.row(2).transpose() + param::ARM_OPT_BETA2 * grad_C_orth.row(2).transpose();
+  p4 += param::ARM_OPT_BETA1 * grad_eta.row(3).transpose() + param::ARM_OPT_BETA2 * grad_C_orth.row(3).transpose();
 
   // --- convert back to polar & enforce feasibility ---
-  std::array<Eigen::Vector2d, 4> feas = {
-    cart_to_polar(p1, 0), cart_to_polar(p2, 1),
-    cart_to_polar(p3, 2), cart_to_polar(p4, 3)
-  };
+  std::array<Eigen::Vector2d, 4> feas = {cart_to_polar(p1, 0), cart_to_polar(p2, 1), cart_to_polar(p3, 2), cart_to_polar(p4, 3)};
 
   if (make_feasible(feas)) {
     cmd.r1 = feas[0];
@@ -255,9 +218,8 @@ static inline void arm_cmd(
     cmd.r3 = feas[2];
     cmd.r4 = feas[3];
   }
-  // If make_feasible fails, cmd.r1~r4 keep their previous values.
 }
 
-} // namespace GD
+}
 
 #endif // GRADIENT_DESCENT_HPP
